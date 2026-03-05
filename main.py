@@ -1,37 +1,40 @@
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 from dotenv import load_dotenv
-from google import genai
-from google.genai import types
 import os
 
-app = FastAPI()
 load_dotenv()
+app = FastAPI()
 
-client = genai.Client(api_key=os.environ.get("GEMINI_API_KEY"))
+# Configura CORS para permitir el frontend local
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[
+        "http://localhost:8000",
+        "http://127.0.0.1:8000",
+        "http://localhost:8001",
+        "http://127.0.0.1:8001",
+    ],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# Monta la carpeta `static` para servir el frontend (index.html)
+app.mount("/", StaticFiles(directory=os.path.join(os.path.dirname(__file__), "static"), html=True), name="static")
+
 
 @app.get("/llm/{prompt}")
 async def read_root(prompt: str):
-    contents = [
-        types.Content(
-            role="user",
-            parts=[types.Part.from_text(text=prompt)],
-        ),
-    ]
+    # Crear una logica para comunicarme con el LLM
+    from google import genai
 
-    tools = [
-        types.Tool(googleSearch=types.GoogleSearch()),
-    ]
-
-    generate_content_config = types.GenerateContentConfig(
-        thinking_config=types.ThinkingConfig(thinking_budget=-1),
-        tools=tools,
-    )
+    # The client gets the API key from the environment variable `GEMINI_API_KEY`.
+    client = genai.Client()
 
     response = client.models.generate_content(
-        model="gemini-2.5-flash",
-        contents=contents,
-        config=generate_content_config,
+        model="gemini-3-flash-preview", contents=prompt
     )
 
-    print(response.text)
     return {"respuesta": response.text}
